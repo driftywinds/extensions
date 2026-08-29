@@ -1,0 +1,38 @@
+name: Mirror to Codeberg
+
+on:
+  push:
+    branches:
+      - "**"
+  schedule:
+    - cron: '0 0 * * 1'
+  workflow_dispatch:
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full clone — fixes "shallow update not allowed"
+          fetch-tags: true # Ensure all tags are fetched too
+
+      - name: Set up SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.CODEBERG_SSH }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan codeberg.org >> ~/.ssh/known_hosts
+      - name: Add Codeberg as remote
+        run: |
+          git remote add codeberg git@codeberg.org:driftywinds/mihon-extensions.git
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+      - name: Push to Codeberg (branches and tags)
+        run: |
+          # --prune removed: Forgejo blocks deletion of the default branch,
+          # which causes the whole push to fail. Remove stale branches manually
+          # on Codeberg if needed.
+          git push --force --tags codeberg 'refs/heads/*:refs/heads/*'
